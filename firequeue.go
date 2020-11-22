@@ -175,7 +175,7 @@ func isErrConnectionResetByPeer(err error) bool {
 }
 
 // Send firehorseInput
-func (q *Queue) Send(r *firehose.PutRecordInput) error {
+func (q *Queue) Send(ctx context.Context, r *firehose.PutRecordInput) error {
 	select {
 	case <-q.initialized:
 		// nop and continue to send
@@ -188,7 +188,7 @@ func (q *Queue) Send(r *firehose.PutRecordInput) error {
 			// nop and continue to send
 		}
 	}
-	_, err := q.firehose.PutRecord(r)
+	_, err := q.firehose.PutRecordWithContext(ctx, r)
 	if err == nil {
 		q.successCount.Add(1)
 		return nil
@@ -224,6 +224,8 @@ func (q *Queue) put(bf backoff.BackOff) time.Duration {
 	}
 	defer done()
 
+	// Don't use the context passed to Loop here, because if we use it, we can't put record when
+	// draining after the context cancellation.
 	if _, err := q.firehose.PutRecord(r); err != nil {
 		if isRetryable(err) {
 			// If an error occurs, move it back to the top of the queue and wait a while.

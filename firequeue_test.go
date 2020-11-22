@@ -45,13 +45,17 @@ type testFirehose struct {
 	counter uint32
 }
 
-func (tf *testFirehose) PutRecord(*firehose.PutRecordInput) (*firehose.PutRecordOutput, error) {
+func (tf *testFirehose) PutRecordWithContext(context.Context, *firehose.PutRecordInput, ...request.Option) (*firehose.PutRecordOutput, error) {
 	if rand.Intn(10) < 2 {
 		// Letting them fail on purpose with a certain probability
 		return nil, &testAWSError{}
 	}
 	atomic.AddUint32(&tf.counter, 1)
 	return &firehose.PutRecordOutput{}, nil
+}
+
+func (tf *testFirehose) PutRecord(r *firehose.PutRecordInput) (*firehose.PutRecordOutput, error) {
+	return tf.PutRecordWithContext(context.Background(), r)
 }
 
 func TestQueue(t *testing.T) {
@@ -83,7 +87,7 @@ func TestQueue(t *testing.T) {
 			const trial = 10000
 			go func() {
 				for i := 0; i < trial; i++ {
-					go q.Send(&firehose.PutRecordInput{})
+					go q.Send(context.Background(), &firehose.PutRecordInput{})
 				}
 			}()
 
